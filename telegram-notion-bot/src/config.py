@@ -14,8 +14,6 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 # Notion API Configuration
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 
-# Anthropic API Configuration (add this after NOTION_TOKEN)
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 # Notion Database IDs
 ASSIGNMENTS_DB_ID = os.getenv("ASSIGNMENTS_DB_ID")
@@ -29,7 +27,6 @@ def validate_config():
     required_vars = {
         "TELEGRAM_BOT_TOKEN": TELEGRAM_BOT_TOKEN,
         "NOTION_TOKEN": NOTION_TOKEN,
-        "ANTHROPIC_API_KEY": ANTHROPIC_API_KEY,
         "ASSIGNMENTS_DB_ID": ASSIGNMENTS_DB_ID,
         "LABS_DB_ID": LABS_DB_ID,
         "PROJECTS_DB_ID": PROJECTS_DB_ID,
