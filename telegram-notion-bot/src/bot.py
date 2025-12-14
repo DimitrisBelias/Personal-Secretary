@@ -14,8 +14,33 @@ from telegram.ext import (
     ContextTypes,
 )
 from datetime import datetime, timedelta
+import threading
+import os
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import config
 import notion_service
+
+
+# =============================================================================
+# WEB SERVER FOR RENDER (keeps the service alive)
+# =============================================================================
+
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b'Bot is running!')
+    
+    def log_message(self, format, *args):
+        pass  # Suppress logging
+
+
+def run_web_server():
+    port = int(os.environ.get('PORT', 10000))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    print(f"🌐 Health check server running on port {port}")
+    server.serve_forever()
 
 
 # =============================================================================
@@ -1602,6 +1627,10 @@ def main():
     )
     
     app.add_handler(conv_handler)
+    
+    # Start web server in background thread (for Render health checks)
+    web_thread = threading.Thread(target=run_web_server, daemon=True)
+    web_thread.start()
     
     # Start
     print("🚀 Bot is running with interactive menus...")
