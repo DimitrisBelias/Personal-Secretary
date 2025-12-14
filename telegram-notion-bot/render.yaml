@@ -1,0 +1,19 @@
+services:
+  - type: worker
+    name: personal-secretary-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python src/bot.py
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: NOTION_TOKEN
+        sync: false
+      - key: ASSIGNMENTS_DB_ID
+        sync: false
+      - key: LABS_DB_ID
+        sync: false
+      - key: PROJECTS_DB_ID
+        sync: false
+      - key: COURSES_DB_ID
+        sync: false
