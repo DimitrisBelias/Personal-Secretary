@@ -14,12 +14,16 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 # Notion API Configuration
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 
-
 # Notion Database IDs
 ASSIGNMENTS_DB_ID = os.getenv("ASSIGNMENTS_DB_ID")
 LABS_DB_ID = os.getenv("LABS_DB_ID")
 PROJECTS_DB_ID = os.getenv("PROJECTS_DB_ID")
 COURSES_DB_ID = os.getenv("COURSES_DB_ID")
+
+# Webhook Configuration (for Render deployment)
+# Render sets RENDER_EXTERNAL_URL automatically for web services
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "")
+PORT = int(os.getenv("PORT", 10000))
 
 # Validate that all required environment variables are set
 def validate_config():

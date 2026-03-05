@@ -14,33 +14,9 @@ from telegram.ext import (
     ContextTypes,
 )
 from datetime import datetime, timedelta
-import threading
 import os
-from http.server import HTTPServer, BaseHTTPRequestHandler
 import config
 import notion_service
-
-
-# =============================================================================
-# WEB SERVER FOR RENDER (keeps the service alive)
-# =============================================================================
-
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/plain')
-        self.end_headers()
-        self.wfile.write(b'Bot is running!')
-    
-    def log_message(self, format, *args):
-        pass  # Suppress logging
-
-
-def run_web_server():
-    port = int(os.environ.get('PORT', 10000))
-    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
-    print(f"🌐 Health check server running on port {port}")
-    server.serve_forever()
 
 
 # =============================================================================
@@ -152,13 +128,11 @@ def items_list_keyboard(items: list, item_type: str):
     buttons = []
     
     for item in items:
-        # Skip items without proper data
         if not item.get('name') or item['name'] == "Untitled":
             continue
         
         emoji = _status_emoji(item.get("status", "Not started"))
         btn_text = f"{emoji} {item['name']} ({item['course_code']})"
-        # Truncate if too long (Telegram limit is 64 bytes for callback_data)
         btn_data = f"{item_type}_{item['id'][:32]}"
         buttons.append([InlineKeyboardButton(btn_text, callback_data=btn_data)])
     
@@ -214,9 +188,7 @@ def courses_keyboard():
     courses = notion_service.list_courses()
     buttons = []
     
-    # Create one button per row (since names can be long)
     for course in courses:
-        # Skip empty courses (no name or no code)
         if not course['name'] or course['name'] == "Untitled" or not course['course_code']:
             continue
             
@@ -224,7 +196,6 @@ def courses_keyboard():
         btn_data = f"course_{course['course_code']}"
         buttons.append([InlineKeyboardButton(btn_text, callback_data=btn_data)])
     
-    # Add back button
     buttons.append([InlineKeyboardButton("🔙 Back", callback_data="back_add")])
     
     return InlineKeyboardMarkup(buttons)
@@ -283,7 +254,7 @@ def back_keyboard(callback_data: str):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command - show main menu."""
-    context.user_data.clear()  # Clear any previous conversation data
+    context.user_data.clear()
     
     welcome = "👋 Welcome to your Personal Secretary!\n\nWhat would you like to do?"
     
@@ -368,7 +339,6 @@ async def add_assignment_name(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     context.user_data["assignment_name"] = update.message.text
     
-    # Check if there are courses
     courses = notion_service.list_courses()
     if not courses:
         await update.message.reply_text(
@@ -389,7 +359,6 @@ async def add_assignment_course(update: Update, context: ContextTypes.DEFAULT_TY
     if query.data == "back_add":
         return await back_to_add_menu(update, context)
     
-    # Extract course code from callback data (format: course_PHY202)
     course_code = query.data.replace("course_", "")
     context.user_data["assignment_course"] = course_code
     
@@ -410,9 +379,8 @@ async def add_assignment_date(update: Update, context: ContextTypes.DEFAULT_TYPE
             "📅 Enter the due date (YYYY-MM-DD format):\n\nExample: 2025-12-20",
             reply_markup=back_keyboard("back_add")
         )
-        return ADD_ASSIGNMENT_DATE  # Stay in same state to receive text input
+        return ADD_ASSIGNMENT_DATE
     
-    # Extract date from callback data (format: date_2025-12-20)
     due_date = query.data.replace("date_", "")
     context.user_data["assignment_date"] = due_date
     
@@ -430,7 +398,6 @@ async def add_assignment_date_text(update: Update, context: ContextTypes.DEFAULT
     """Handle custom date text input for assignment."""
     date_text = update.message.text.strip()
     
-    # Validate date format
     try:
         datetime.strptime(date_text, "%Y-%m-%d")
     except ValueError:
@@ -468,7 +435,6 @@ async def add_assignment_notes(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         notes = update.message.text
     
-    # Save to Notion
     result = notion_service.add_assignment(
         name=context.user_data["assignment_name"],
         course_code=context.user_data["assignment_course"],
@@ -892,7 +858,6 @@ async def list_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("📭 No assignments found.", reply_markup=list_menu_keyboard())
             return LIST_MENU
         
-        # Filter out empty items
         items = [i for i in items if i.get('name') and i['name'] != "Untitled"]
         
         if not items:
@@ -970,7 +935,6 @@ async def list_assignments_select_handler(update: Update, context: ContextTypes.
     if query.data.startswith("assignment_"):
         item_id = query.data.replace("assignment_", "")
         
-        # Find the full item details
         items = notion_service.list_assignments()
         item = None
         for i in items:
@@ -1195,7 +1159,6 @@ async def edit_date_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         
         if query.data == "back_add":
-            # Go back to item action menu
             item = notion_service.get_item_by_id(item_id)
             if item:
                 emoji = _status_emoji(item['status'])
@@ -1353,7 +1316,6 @@ async def edit_notes_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         return EDIT_NOTES
     
-    # Handle text input
     new_notes = update.message.text.strip()
     item_id = context.user_data.get("selected_item_id", "")
     
@@ -1473,11 +1435,11 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================================================================
-# MAIN
+# MAIN - WEBHOOK MODE FOR RENDER
 # =============================================================================
 
 def main():
-    """Start the bot."""
+    """Start the bot using webhooks (for Render deployment)."""
     # Validate config
     try:
         config.validate_config()
@@ -1628,13 +1590,25 @@ def main():
     
     app.add_handler(conv_handler)
     
-    # Start web server in background thread (for Render health checks)
-    web_thread = threading.Thread(target=run_web_server, daemon=True)
-    web_thread.start()
+    # --- WEBHOOK MODE ---
+    # Render sets RENDER_EXTERNAL_URL automatically for web services
+    webhook_url = config.RENDER_EXTERNAL_URL
+    port = config.PORT
     
-    # Start
-    print("🚀 Bot is running with interactive menus...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    if webhook_url:
+        # Running on Render — use webhooks
+        print(f"🚀 Bot starting in WEBHOOK mode on port {port}")
+        print(f"🔗 Webhook URL: {webhook_url}")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path="webhook",
+            webhook_url=f"{webhook_url}/webhook",
+        )
+    else:
+        # Running locally — use polling (for development)
+        print("🚀 Bot starting in POLLING mode (local development)")
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
